@@ -1,0 +1,128 @@
+name: Publish to NPM
+
+on: [workflow_dispatch]
+
+jobs:
+  build_linux:
+    name: ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-18.04]
+        ocaml-compiler:
+          - ocaml-variants.4.10.2+rescript
+
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          submodules: 'true'
+
+      - name: Use OCaml ${{ matrix.ocaml-compiler}}
+        uses: ocaml/setup-ocaml@v2
+        with:
+          ocaml-compiler: ${{ matrix.ocaml-compiler }}
+
+      - name: Use npm
+        uses: actions/setup-node@v2
+        with:
+          node-version: '16'
+
+      - name: Install deps
+        run: npm install
+
+      - name: Ninja config
+        run: opam exec -- ./scripts/ninja.js config
+
+      - name: Ninja build
+        run: opam exec -- ./scripts/ninja.js build
+
+      - name: (only on release) Upload artifacts ${{ matrix.os }}
+        uses: actions/upload-artifact@master
+        with:
+          name: ${{ matrix.os }}
+          path: |
+            ./linux/bsb_helper.exe
+            ./linux/bsc.exe
+            ./linux/rescript.exe
+          if-no-files-found: error
+
+  build_macos:
+    name: ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [macOS-latest]
+        ocaml-compiler:
+          - ocaml-variants.4.10.2+rescript
+
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          submodules: 'true'
+
+      - name: Use OCaml ${{ matrix.ocaml-compiler}}
+        uses: ocaml/setup-ocaml@v2
+        with:
+          ocaml-compiler: ${{ matrix.ocaml-compiler }}
+
+      - name: Use npm
+        uses: actions/setup-node@v2
+        with:
+          node-version: '16'
+
+      - name: Install deps
+        run: npm install
+
+      - name: Ninja config
+        run: opam exec -- ./scripts/ninja.js config
+
+      - name: Ninja build
+        run: opam exec -- ./scripts/ninja.js build
+
+      - name: (only on release) Upload artifacts ${{ matrix.os }}
+        uses: actions/upload-artifact@master
+        with:
+          name: ${{ matrix.os }}
+          path: |
+            ./darwin/bsb_helper.exe
+            ./darwin/bsc.exe
+            ./darwin/rescript.exe
+          if-no-files-found: error
+
+  publish:
+    needs: [build_linux, build_macos]
+    name: (only on release) Publish
+    runs-on: ubuntu-18.04
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-node@v1
+        with:
+          node-version: "12.x"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Download linux artifacts
+        if: success()
+        uses: actions/download-artifact@master
+        with:
+          name: ubuntu-18.04
+          path: binaries/linux
+
+      - name: Download macOS artifacts
+        if: success()
+        uses: actions/download-artifact@master
+        with:
+          name: macOS-latest
+          path: binaries/darwin
+
+      - name: Move artifacts
+        if: success()
+        run: |
+          mv binaries/linux/* linux
+          cp binaries/darwin/* darwin
+          mv binaries/darwin/* darwinarm64
+
+      - name: Publish
+        if: success()
+        run: npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_AUTH_TOKEN }}
