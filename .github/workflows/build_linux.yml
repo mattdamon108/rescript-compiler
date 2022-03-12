@@ -1,0 +1,47 @@
+name: Build Linux
+
+on: [workflow_dispatch]
+
+jobs:
+  build_linux:
+    name: ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-18.04]
+        ocaml-compiler:
+          - ocaml-variants.4.10.2+rescript
+
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          submodules: 'true'
+
+      - name: Use OCaml ${{ matrix.ocaml-version}}
+        uses: ocaml/setup-ocaml@v2
+        with:
+          ocaml-compiler: ${{ matrix.ocaml-compiler }}
+
+      - name: Use npm
+        uses: actions/setup-node@v2
+        with:
+          node-version: '16'
+
+      - name: Install deps
+        run: npm install
+
+      - name: Ninja config
+        run: opam exec -- ./scripts/ninja.js config
+
+      - name: Ninja build
+        run: opam exec -- ./scripts/ninja.js build
+
+      - name: (only on release) Upload artifacts ${{ matrix.os }}
+        uses: actions/upload-artifact@master
+        with:
+          name: ${{ matrix.os }}
+          path: |
+            ./linux/bsb_helper.exe
+            ./linux/bsc.exe
+            ./linux/rescript.exe
+          if-no-files-found: error
