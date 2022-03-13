@@ -16,7 +16,7 @@ jobs:
       matrix:
         os: [ubuntu-18.04]
         ocaml-compiler:
-          - ocaml-variants.4.10.2+rescript
+          - ocaml-variants.4.10.3+trunk
 
     steps:
       - uses: actions/checkout@v2
